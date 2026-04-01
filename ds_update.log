@@ -1,0 +1,76 @@
+2026-03-29 22:14:02,741 __init__.py[line:13](Pid:89294 Tname:MainThread) ERROR Uncaught exception:
+Traceback (most recent call last):
+  File "/Users/cheniewiew/Library/Python/3.9/bin/biliup", line 6, in <module>
+    sys.exit(arg_parser())
+  File "/Users/cheniewiew/Library/Python/3.9/lib/python/site-packages/biliup/__main__.py", line 21, in arg_parser
+    asyncio.run(main())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/runners.py", line 44, in run
+    return loop.run_until_complete(main)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 642, in run_until_complete
+    return future.result()
+  File "/Users/cheniewiew/Library/Python/3.9/lib/python/site-packages/biliup/__main__.py", line 33, in main
+    await loop.run_in_executor(None, stream_gears.main_loop)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+RuntimeError: [1mopen cookies file: cookies.json[22m
+├╴at [3m/Users/runner/work/biliup/biliup/crates/biliup-cli/src/uploader.rs:295:36[23m
+│
+╰─▶ [1mNo such file or directory (os error 2)[22m
+    ╰╴at [3m/Users/runner/work/biliup/biliup/crates/biliup-cli/src/uploader.rs:295:36[23m
+2026-03-29 22:16:41,031 __init__.py[line:13](Pid:89400 Tname:MainThread) ERROR Uncaught exception:
+Traceback (most recent call last):
+  File "/Users/cheniewiew/Library/Python/3.9/bin/biliup", line 6, in <module>
+    sys.exit(arg_parser())
+  File "/Users/cheniewiew/Library/Python/3.9/lib/python/site-packages/biliup/__main__.py", line 21, in arg_parser
+    asyncio.run(main())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/runners.py", line 44, in run
+    return loop.run_until_complete(main)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 642, in run_until_complete
+    return future.result()
+  File "/Users/cheniewiew/Library/Python/3.9/lib/python/site-packages/biliup/__main__.py", line 33, in main
+    await loop.run_in_executor(None, stream_gears.main_loop)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+RuntimeError: [1mcover: auto[22m
+├╴at [3m/Users/runner/work/biliup/biliup/crates/biliup-cli/src/uploader.rs:322:51[23m
+│
+╰─▶ [1mNo such file or directory (os error 2)[22m
+    ╰╴at [3m/Users/runner/work/biliup/biliup/crates/biliup-cli/src/uploader.rs:322:51[23m
+2026-03-29 22:22:01,941 __init__.py[line:13](Pid:89761 Tname:MainThread) ERROR Uncaught exception:
+Traceback (most recent call last):
+  File "/Users/cheniewiew/Library/Python/3.9/bin/biliup", line 6, in <module>
+    sys.exit(arg_parser())
+  File "/Users/cheniewiew/Library/Python/3.9/lib/python/site-packages/biliup/__main__.py", line 21, in arg_parser
+    asyncio.run(main())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/runners.py", line 44, in run
+    return loop.run_until_complete(main)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 642, in run_until_complete
+    return future.result()
+  File "/Users/cheniewiew/Library/Python/3.9/lib/python/site-packages/biliup/__main__.py", line 33, in main
+    await loop.run_in_executor(None, stream_gears.main_loop)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+RuntimeError: [1mUnknown Error[22m
+├╴at [3m/Users/runner/work/biliup/biliup/crates/biliup-cli/src/uploader.rs:158:14[23m
+│
+╰─▶ [1mResponseData { code: 21005, data: None, message: "Tag不能为空，总数量不能超过12个， 并且单个不能超过20个字", ttl: Some(1) }[22m
+    ╰╴at [3m/Users/runner/work/biliup/biliup/crates/biliup-cli/src/uploader.rs:158:14[23m
+2026-03-29 22:23:25,671 __init__.py[line:13](Pid:89826 Tname:MainThread) ERROR Uncaught exception:
+Traceback (most recent call last):
+  File "/Users/cheniewiew/Library/Python/3.9/bin/biliup", line 6, in <module>
+    sys.exit(arg_parser())
+  File "/Users/cheniewiew/Library/Python/3.9/lib/python/site-packages/biliup/__main__.py", line 21, in arg_parser
+    asyncio.run(main())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/runners.py", line 44, in run
+    return loop.run_until_complete(main)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 642, in run_until_complete
+    return future.result()
+  File "/Users/cheniewiew/Library/Python/3.9/lib/python/site-packages/biliup/__main__.py", line 33, in main
+    await loop.run_in_executor(None, stream_gears.main_loop)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+RuntimeError: [1mUnknown Error[22m
+├╴at [3m/Users/runner/work/biliup/biliup/crates/biliup-cli/src/uploader.rs:158:14[23m
+│
+╰─▶ [1mResponseData { code: 21005, data: None, message: "Tag不能为空，总数量不能超过12个， 并且单个不能超过20个字", ttl: Some(1) }[22m
+    ╰╴at [3m/Users/runner/work/biliup/biliup/crates/biliup-cli/src/uploader.rs:158:14[23m
