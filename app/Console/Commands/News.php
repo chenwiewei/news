@@ -28,12 +28,11 @@ class News extends Command
         // 大宗商品与汇率
         '布伦特原油' => '112.B00Y',    // ICE 布伦特原油
         '现货黄金' => '122.XAU',      // COMEX 黄金
-
+        '美元' => '100.UDI',     // 美元指数
         // 美洲市场（美股）
         '道琼斯' => '100.DJIA',      // 道琼斯工业平均指数
         '纳斯达克' => '100.NDX',  // 纳斯达克综合指数
         '标普 500' => '100.SPX',     // 标普 500 指数
-        '美元' => '100.UDI',     // 美元指数
         //'美原油' => '102.CL00Y',        // NYMEX 原油
         '美股重要板块：科技行业' => '107.XLK',     // 美股 科技行业精选
         '通信服务' => '107.XLC',     // 美股 科技行业精选
@@ -64,7 +63,7 @@ class News extends Command
         '107.XLY' => '亚马逊 特斯拉 家得宝 麦当劳 耐克',
         '107.XLU' => '杜克能源 南方公司 美国电力 新纪元能源',
         '107.XLB' => '纽柯钢铁 美铝 PPG 工业 利尔化学',
-        '100.XIN9' => '',
+        '100.XIN9' => '走势和上证指数高度相关',
     ];
 
     /**
@@ -122,7 +121,7 @@ class News extends Command
                 if(array_key_exists($secid, $noIndexSecid)){
                     $line = "{$name}：{$trend}" . $percent . "\n";
                 }else{
-                    $line = "{$name}：指数收{$price}，{$trend}"  . $percent . "\n";
+                    $line = "{$name}：指数目前{$price}，{$trend}"  . $percent . "\n";
                 }
                 $content .= $line;
                 $this->info($line);
@@ -172,20 +171,32 @@ class News extends Command
 
 // -------------------------- 函数 1：东方财富 API --------------------------
     private function get_data_from_eastmoney($secid, $name) {
+        sleep(1);
         // 东方财富全球指数实时行情 API
         $url = "https://push2.eastmoney.com/api/qt/stock/get";
-
         try {
             $response = Http::withHeaders([
                 'User-Agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.3.1 Safari/605.1.15',
-                'Referer' => 'https://quote.eastmoney.com/',
-                'Accept' => 'application/json, text/javascript, */*; q=0.01'
+                //'Referer' => 'https://quote.eastmoney.com/',
+                'Accept' => 'application/json,text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Connection' => 'keep-alive',
+                'Accept-Encoding' => 'gzip, deflate, br, zstd',
+                'Accept-Language' => 'zh-CN,zh-Hans;q=0.9',
+                'Cookie' => 'st_inirUrl=https%3A%2F%2Fbaidu.com%2F; st_psi=2026040314103033-111000300841-4486875241; st_pvi=43185757987776; st_sn=705; st_sp=2026-03-17%2021%3A04%3A59; st_asi=delete; emshistory=%5B%22%E6%81%92%E7%94%9F%E5%8C%BB%E8%8D%AF%22%2C%22%E6%81%92%E7%94%9F%E7%A7%91%E6%8A%80%22%2C%22%E5%8D%81%E5%B9%B4%E6%9C%9F%E7%BE%8E%E5%80%BA%22%2C%22%E9%87%91%E8%9E%8DETF-SPDR%22%2C%22xlf%22%2C%22xlF%22%2C%22xlv%22%2C%22%E9%9F%A9%E5%9B%BD%22%2C%22%E7%BE%8E%E5%8E%9F%E6%B2%B9%22%2C%22%E5%B8%83%E4%BC%A6%E7%89%B9%E5%8E%9F%E6%B2%B9%22%5D; fullscreengg=1; fullscreengg2=1; gviem=4NTJOJAcXh9omajR8Unpu5397; gviem_create_time=1773752700502; nid18=07ae44c788fc3c3386bd4c0eca23bd0b; nid18_create_time=1773752700502; qgqp_b_id=eb47925c3f0aaaf096879f27128adae9; st_nvi=unqJMqHLBAppK28Ze95e2373d; st_si=77226005996683',
+                'Priority' => 'u=0, i',
+                'Sec-Fetch-Dest' => 'document',
+                'Sec-Fetch-Mode' => 'navigate',
+                'Sec-Fetch-Site' => 'none'
             ])
                 ->withOptions([
                     'version' => 1.1, // 强制HTTP/1.1，解决服务器断开问题
-                    'curl' => [
-                        CURLOPT_TIMEOUT => 15,
-                    ]
+                    'verify' => false, // 跳过SSL校验（关键）
+                    'timeout' => 10,
+                    'connect_timeout' => 5,
+                    // 以下是 libcurl 级别的 SSL 选项（7.88.1+ 支持）
+                    'ssl_options' => [
+                        'ignore_unexpected_eof' => true, // 忽略 EOF 错误
+                    ],
                 ])
                 ->timeout(15)
                 ->get($url, [
@@ -240,6 +251,7 @@ class News extends Command
 
 // -------------------------- 函数 2：download_chart() 下载 K 线图 --------------------------
     private function download_chart($name, $secid, $baseDir, $index) {
+        sleep(1);
         try {
             // 东方财富 K 线图 URL - 修正为单行
             $time = time();
@@ -247,14 +259,26 @@ class News extends Command
 
             $response = Http::withHeaders([
                 'User-Agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.3.1 Safari/605.1.15',
-                'Referer' => 'https://quote.eastmoney.com/',
-                'Accept' => 'image/gif,image/png,image/jpeg,*/*'
+                //'Referer' => 'https://quote.eastmoney.com/',
+                'Accept' => 'application/json,text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Connection' => 'keep-alive',
+                'Accept-Encoding' => 'gzip, deflate, br, zstd',
+                'Accept-Language' => 'zh-CN,zh-Hans;q=0.9',
+                'Cookie' => 'st_inirUrl=https%3A%2F%2Fbaidu.com%2F; st_psi=2026040314103033-111000300841-4486875241; st_pvi=43185757987776; st_sn=705; st_sp=2026-03-17%2021%3A04%3A59; st_asi=delete; emshistory=%5B%22%E6%81%92%E7%94%9F%E5%8C%BB%E8%8D%AF%22%2C%22%E6%81%92%E7%94%9F%E7%A7%91%E6%8A%80%22%2C%22%E5%8D%81%E5%B9%B4%E6%9C%9F%E7%BE%8E%E5%80%BA%22%2C%22%E9%87%91%E8%9E%8DETF-SPDR%22%2C%22xlf%22%2C%22xlF%22%2C%22xlv%22%2C%22%E9%9F%A9%E5%9B%BD%22%2C%22%E7%BE%8E%E5%8E%9F%E6%B2%B9%22%2C%22%E5%B8%83%E4%BC%A6%E7%89%B9%E5%8E%9F%E6%B2%B9%22%5D; fullscreengg=1; fullscreengg2=1; gviem=4NTJOJAcXh9omajR8Unpu5397; gviem_create_time=1773752700502; nid18=07ae44c788fc3c3386bd4c0eca23bd0b; nid18_create_time=1773752700502; qgqp_b_id=eb47925c3f0aaaf096879f27128adae9; st_nvi=unqJMqHLBAppK28Ze95e2373d; st_si=77226005996683',
+                'Priority' => 'u=0, i',
+                'Sec-Fetch-Dest' => 'document',
+                'Sec-Fetch-Mode' => 'navigate',
+                'Sec-Fetch-Site' => 'none'
             ])
                 ->withOptions([
                     'version' => 1.1, // 强制HTTP/1.1，解决服务器断开问题
-                    'curl' => [
-                        CURLOPT_TIMEOUT => 10,
-                    ]
+                    'verify' => false, // 跳过SSL校验（关键）
+                    'timeout' => 10,
+                    'connect_timeout' => 5,
+                    // 以下是 libcurl 级别的 SSL 选项（7.88.1+ 支持）
+                    'ssl_options' => [
+                        'ignore_unexpected_eof' => true, // 忽略 EOF 错误
+                    ],
                 ])
                 ->timeout(15)
                 ->get($chartUrl);
