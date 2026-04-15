@@ -25,7 +25,7 @@
                                     <span class="px-3 py-1 rounded-full text-sm font-bold bg-green-100 text-green-800">
                                     已完成
                                 </span>
-                                    <a href="{{ route('video.download', base64_encode($project['path'])) }}"
+                                    <a href="{{ route('video.download', ['encodedPath' => $project['path']]) }}"
                                        class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold">
                                         下载视频
                                     </a>
@@ -35,7 +35,7 @@
                                 </span>
                                 @endif
 
-                                <a href="{{ route('video.generate', base64_encode($project['path'])) }}"
+                                <a href="{{ route('video.generate', ['encodedPath' => $project['path']]) }}"
                                    class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold">
                                     重新生成
                                 </a>

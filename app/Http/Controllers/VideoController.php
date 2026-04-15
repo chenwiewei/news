@@ -10,8 +10,8 @@ class VideoController extends Controller
     public function index()
     {
         $date = date('Ymd');
-        $user = exec('whoami');
-        $baseDir = "/Users/$user/Desktop/视频生成项目_$date";
+        //$user = exec('whoami');
+        $baseDir = "/Users/cheniewiew/Desktop/video_create_$date";
 
         $projects = [];
         if (is_dir($baseDir)) {
@@ -45,42 +45,107 @@ class VideoController extends Controller
             'title' => 'required|string|max:255',
             'segments' => 'required|array|min:1',
             'segments.*.text' => 'required|string',
-            'segments.*.duration' => 'required|integer|min:1',
-            'segments.*.image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10240',
-            'segments.*.video' => 'nullable|mimetypes:video/mp4,video/quicktime,video/x-msvideo|max:102400',
+            'segments.*.image' => 'nullable|file|mimes:jpeg,png,jpg,gif,webp',
+            'segments.*.video' => 'nullable|file|mimetypes:video/mp4,video/quicktime,video/x-msvideo,video/x-matroska',
         ]);
 
-        $user = exec('whoami');
         $date = date('Ymd_His');
-        $baseDir = "/Users/$user/Desktop/视频生成项目_{$date}/{$request->title}";
+        $baseDir = "/Users/cheniewiew/Desktop/video_create_{$date}/{$request->title}";
 
         if (!is_dir($baseDir)) {
             mkdir($baseDir, 0777, true);
         }
 
-        $segments = [];
+        $debugUpload = [];
+        $debugUpload[] = "收到 " . count($request->segments) . " 个分段";
 
         foreach ($request->segments as $index => $segmentData) {
+            $debugUpload[] = "分段 {$index}: text=" . substr($segmentData['text'], 0, 50);
+
+            if ($request->hasFile("segments.{$index}.image")) {
+                $file = $request->file("segments.{$index}.image");
+                $debugUpload[] = "  - 图片: {$file->getClientOriginalName()}, 大小: " . ($file->getSize() / 1024 / 1024) . "MB, MIME: {$file->getMimeType()}";
+                $debugUpload[] = "  - 临时路径: {$file->getPathname()}";
+                $debugUpload[] = "  - 是否有效: " . ($file->isValid() ? '是' : '否');
+            } else {
+                $debugUpload[] = "  - 图片: 未上传";
+            }
+        }
+
+        file_put_contents("{$baseDir}/debug_store.txt", implode("\n", $debugUpload));
+
+        $segments = [];
+        $voice = 'Lilian';
+
+        foreach ($request->segments as $index => $segmentData) {
+            $text = $segmentData['text'];
+
+            $tempAudioFile = tempnam(sys_get_temp_dir(), 'audio_calc_') . '.aiff';
+
+            $command = sprintf(
+                'say -v %s -o %s %s 2>&1',
+                escapeshellarg($voice),
+                escapeshellarg($tempAudioFile),
+                escapeshellarg($text)
+            );
+
+            exec($command, $output, $returnVar);
+
+            if ($returnVar === 0 && file_exists($tempAudioFile)) {
+                $duration = $this->get_audio_duration($tempAudioFile);
+                @unlink($tempAudioFile);
+            } else {
+                @unlink($tempAudioFile);
+                $wordsCount = mb_strlen($text, 'UTF-8');
+                $duration = max(2, ceil($wordsCount * 0.4));
+            }
+
             $segment = [
-                'text' => $segmentData['text'],
-                'duration' => (int) $segmentData['duration'],
+                'text' => $text,
+                'duration' => (int) ceil($duration),
                 'order' => $index,
             ];
 
             if ($request->hasFile("segments.{$index}.image")) {
-                $imagePath = $request->file("segments.{$index}.image")->storeAs(
-                    'temp/' . uniqid(),
-                    $request->file("segments.{$index}.image")->getClientOriginalName()
-                );
-                $segment['image_path'] = storage_path('app/' . $imagePath);
+                $file = $request->file("segments.{$index}.image");
+
+                try {
+                    $imagePath = $file->storeAs(
+                        'temp/' . uniqid(),
+                        $file->getClientOriginalName(),
+                        'public'
+                    );
+                    $fullPath = storage_path('app/public/' . $imagePath);
+
+                    if (file_exists($fullPath)) {
+                        $segment['image_path'] = $fullPath;
+                    } else {
+                        \Log::error("上传的文件不存在: {$fullPath}");
+                    }
+                } catch (\Exception $e) {
+                    \Log::error("文件上传异常: " . $e->getMessage());
+                }
             }
 
             if ($request->hasFile("segments.{$index}.video")) {
-                $videoPath = $request->file("segments.{$index}.video")->storeAs(
-                    'temp/' . uniqid(),
-                    $request->file("segments.{$index}.video")->getClientOriginalName()
-                );
-                $segment['video_path'] = storage_path('app/' . $videoPath);
+                $file = $request->file("segments.{$index}.video");
+
+                try {
+                    $videoPath = $file->storeAs(
+                        'temp/' . uniqid(),
+                        $file->getClientOriginalName(),
+                        'public'
+                    );
+                    $fullPath = storage_path('app/public/' . $videoPath);
+
+                    if (file_exists($fullPath)) {
+                        $segment['video_path'] = $fullPath;
+                    } else {
+                        \Log::error("上传的视频文件不存在: {$fullPath}");
+                    }
+                } catch (\Exception $e) {
+                    \Log::error("视频上传异常: " . $e->getMessage());
+                }
             }
 
             $segments[] = $segment;
@@ -95,12 +160,12 @@ class VideoController extends Controller
 
         file_put_contents("$baseDir/project.json", json_encode($projectData, JSON_UNESCAPED_UNICODE));
 
-        return redirect()->route('video.generate', base64_encode($baseDir));
+        return redirect()->route('video.generate', ['encodedPath' => $baseDir]);
     }
 
     public function generate($encodedPath)
     {
-        $baseDir = base64_decode($encodedPath);
+        $baseDir = $encodedPath;
 
         if (!is_dir($baseDir)) {
             abort(404, '项目不存在');
@@ -113,35 +178,47 @@ class VideoController extends Controller
         try {
             $successData = [];
             $imageIndex = 1;
+            $debugInfo = [];
 
             foreach ($segments as $index => $segment) {
                 $imageName = null;
+                $hasVideo = false;
 
-                if (!empty($segment['image_path']) && file_exists($segment['image_path'])) {
-                    $imageName = sprintf("%02d_%s.png", $imageIndex, $segment['text']);
-                    $destPath = "$baseDir/$imageName";
+                if (!empty($segment['image_path'])) {
+                    $sourcePath = $segment['image_path'];
+                    $debugInfo[] = "分段 {$index}: image_path={$sourcePath}, exists=" . (file_exists($sourcePath) ? 'yes' : 'no');
 
-                    if (pathinfo($segment['image_path'], PATHINFO_EXTENSION) !== 'png') {
-                        $convertCmd = sprintf(
-                            'magick %s %s 2>&1',
-                            escapeshellarg($segment['image_path']),
-                            escapeshellarg($destPath)
-                        );
-                        exec($convertCmd, $output, $returnVar);
-                        if ($returnVar !== 0) {
-                            copy($segment['image_path'], $destPath);
+                    if (file_exists($sourcePath)) {
+                        $imageName = sprintf("%02d_image.png", $imageIndex);
+                        $destPath = "$baseDir/$imageName";
+
+                        $copyResult = copy($sourcePath, $destPath);
+
+                        $debugInfo[] = "分段 {$index}: 复制到 {$destPath}, 结果=" . ($copyResult ? 'success' : 'failed') . ", 目标存在=" . (file_exists($destPath) ? 'yes' : 'no');
+
+                        if ($copyResult && file_exists($destPath)) {
+                            $imageIndex++;
+                        } else {
+                            $imageName = null;
                         }
-                    } else {
-                        copy($segment['image_path'], $destPath);
                     }
+                } elseif (!empty($segment['video_path'])) {
+                    $sourcePath = $segment['video_path'];
+                    $debugInfo[] = "分段 {$index}: video_path={$sourcePath}, exists=" . (file_exists($sourcePath) ? 'yes' : 'no');
 
-                    $imageIndex++;
-                } elseif (!empty($segment['video_path']) && file_exists($segment['video_path'])) {
-                    $videoName = sprintf("%02d_video_%s.mp4", $imageIndex, $segment['text']);
-                    $destPath = "$baseDir/$videoName";
-                    copy($segment['video_path'], $destPath);
-                    $imageName = $videoName;
-                    $imageIndex++;
+                    if (file_exists($sourcePath)) {
+                        $imageName = sprintf("%02d_video.mp4", $imageIndex);
+                        $destPath = "$baseDir/$imageName";
+
+                        if (copy($sourcePath, $destPath) && file_exists($destPath)) {
+                            $hasVideo = true;
+                            $imageIndex++;
+                        } else {
+                            $imageName = null;
+                        }
+                    }
+                } else {
+                    $debugInfo[] = "分段 {$index}: 没有 image_path 或 video_path";
                 }
 
                 $successData[] = [
@@ -150,9 +227,11 @@ class VideoController extends Controller
                     'image' => $imageName,
                     'index' => $index + 1,
                     'duration' => $segment['duration'],
-                    'has_video' => !empty($segment['video_path']),
+                    'has_video' => $hasVideo,
                 ];
             }
+
+            file_put_contents("{$baseDir}/debug_copy.txt", implode("\n", $debugInfo));
 
             $audioInfo = $this->generate_segmented_audio($baseDir, $successData);
 
@@ -274,6 +353,8 @@ class VideoController extends Controller
             $outputVideo = "{$baseDir}/{$title}.mp4";
             $tempFile = tempnam(sys_get_temp_dir(), 'ffmpeg_');
             $listContent = "";
+            $processedCount = 0;
+            $debugLog = [];
 
             foreach ($segments as $seg) {
                 $index = $seg['index'];
@@ -281,75 +362,68 @@ class VideoController extends Controller
                 $name = $seg['name'];
                 $line = $seg['line'];
 
-                $imagePath = null;
+                $mediaPath = null;
+                $isVideo = false;
+
                 foreach ($successData as $item) {
                     if ($item['index'] === $index) {
-                        if ($item['has_video']) {
-                            $imagePath = $baseDir . '/' . $item['image'];
-                        } else {
-                            $imagePath = $baseDir . '/' . $item['image'];
+                        if (!empty($item['image'])) {
+                            $mediaPath = $baseDir . '/' . $item['image'];
+                            $isVideo = $item['has_video'];
                         }
                         break;
                     }
                 }
 
-                if (!$imagePath || !file_exists($imagePath)) {
+                $debugLog[] = "分段 {$index}: mediaPath=" . ($mediaPath ?? 'null') . ", exists=" . ($mediaPath ? (file_exists($mediaPath) ? 'yes' : 'no') : 'N/A');
+
+                if (!$mediaPath || !file_exists($mediaPath)) {
                     continue;
                 }
 
                 $clipFile = "{$baseDir}/clip_{$index}.mp4";
 
-                if (pathinfo($imagePath, PATHINFO_EXTENSION) === 'mp4') {
-                    $probeCmd = sprintf(
-                        'ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 %s',
-                        escapeshellarg($imagePath)
-                    );
-                    exec($probeCmd, $videoDurationOutput, $videoReturnVar);
-                    $videoDuration = floatval(trim($videoDurationOutput[0] ?? 0));
-
-                    if ($videoDuration > $duration) {
-                        $trimCmd = sprintf(
-                            'ffmpeg -y -i %s -t %f -c:v copy -c:a copy %s 2>&1',
-                            escapeshellarg($imagePath),
-                            $duration,
-                            escapeshellarg($clipFile)
-                        );
-                        exec($trimCmd, $trimOutput, $trimReturnVar);
-                    } else {
-                        $clipFile = $imagePath;
-                    }
+                if ($isVideo && pathinfo($mediaPath, PATHINFO_EXTENSION) === 'mp4') {
+                    copy($mediaPath, $clipFile);
+                    $debugLog[] = "分段 {$index}: 视频文件已复制";
                 } else {
-                    $imageWithText = "{$baseDir}/image_{$index}_with_text.png";
-                    $textImage = "{$baseDir}/text_{$index}.png";
+                    $finalImage = $mediaPath;
 
-                    $createTextCmd = sprintf(
-                        'magick xc:none -size 1920x80 -font "%s" -pointsize 40 -fill black -stroke black -strokewidth 1 -gravity center caption:"%s" png32:%s 2>&1',
-                        "/System/Library/Fonts/STHeiti Medium.ttc",
-                        addslashes($line),
-                        escapeshellarg($textImage)
-                    );
+                    if (!empty($line)) {
+                        $imageWithText = "{$baseDir}/image_{$index}_with_text.png";
+                        $textImage = "{$baseDir}/text_{$index}.png";
 
-                    exec($createTextCmd, $textOutput, $textReturn);
-
-                    if ($textReturn === 0 && file_exists($textImage)) {
-                        $compositeCmd = sprintf(
-                            'magick %s -resize 1920x1040 -gravity center -background black -extent 1920x1080 %s -gravity South -geometry +0+0 -compose over -composite %s 2>&1',
-                            escapeshellarg($imagePath),
-                            escapeshellarg($textImage),
-                            escapeshellarg($imageWithText)
+                        $createTextCmd = sprintf(
+                            'magick xc:none -size 1920x80 -font "%s" -pointsize 40 -fill black -stroke black -strokewidth 1 -gravity center caption:"%s" png32:%s 2>&1',
+                            "/System/Library/Fonts/STHeiti Medium.ttc",
+                            addslashes($line),
+                            escapeshellarg($textImage)
                         );
 
-                        exec($compositeCmd, $compOutput, $compReturn);
-                        @unlink($textImage);
+                        exec($createTextCmd, $textOutput, $textReturn);
 
-                        if ($compReturn === 0 && file_exists($imageWithText)) {
-                            $finalImage = $imageWithText;
-                        } else {
-                            $finalImage = $imagePath;
+                        $debugLog[] = "分段 {$index}: 文字图层创建返回码={$textReturn}, 文件存在=" . (file_exists($textImage) ? 'yes' : 'no');
+
+                        if ($textReturn === 0 && file_exists($textImage)) {
+                            $compositeCmd = sprintf(
+                                'magick %s -resize 1920x1040 -gravity center -background black -extent 1920x1080 %s -gravity South -geometry +0+0 -compose over -composite %s 2>&1',
+                                escapeshellarg($mediaPath),
+                                escapeshellarg("{$baseDir}/text_{$index}-1.png"),
+                                escapeshellarg($imageWithText)
+                            );
+
+                            exec($compositeCmd, $compOutput, $compReturn);
+
+                            $debugLog[] = "分段 {$index}: 图片合成返回码={$compReturn}, 文件存在=" . (file_exists($imageWithText) ? 'yes' : 'no');
+
+                            @unlink($textImage);
+                            @unlink("{$baseDir}/text_{$index}-0.png");
+                            @unlink("{$baseDir}/text_{$index}-1.png");
+
+                            if ($compReturn === 0 && file_exists($imageWithText)) {
+                                $finalImage = $imageWithText;
+                            }
                         }
-                    } else {
-                        $finalImage = $imagePath;
-                        @unlink($textImage);
                     }
 
                     $command = sprintf(
@@ -360,12 +434,22 @@ class VideoController extends Controller
                     );
 
                     exec($command, $output, $returnVar);
+
+                    $debugLog[] = "分段 {$index}: FFmpeg 返回码={$returnVar}, clip 存在=" . (file_exists($clipFile) ? 'yes' : 'no');
+
                     @unlink($imageWithText);
                 }
 
                 if (file_exists($clipFile)) {
                     $listContent .= "file '" . str_replace("'", "'\\''", realpath($clipFile)) . "'\n";
+                    $processedCount++;
                 }
+            }
+
+            file_put_contents("{$baseDir}/debug_log.txt", implode("\n", $debugLog));
+
+            if ($processedCount === 0) {
+                throw new \Exception("没有有效的视频片段可以合并（共检查了 " . count($segments) . " 个分段）\n调试信息:\n" . implode("\n", $debugLog));
             }
 
             file_put_contents($tempFile, $listContent);
@@ -378,6 +462,11 @@ class VideoController extends Controller
             );
 
             exec($mergeCommand, $mergeOutput, $mergeVar);
+
+            if ($mergeVar !== 0) {
+                file_put_contents("{$baseDir}/ffmpeg_merge_error.log", implode("\n", $mergeOutput));
+            }
+
             @unlink($tempFile);
 
             foreach ($segments as $seg) {
@@ -385,7 +474,7 @@ class VideoController extends Controller
             }
 
             if ($mergeVar !== 0 || !file_exists($outputVideo)) {
-                throw new \Exception("视频合并失败");
+                throw new \Exception("视频合并失败，返回码: {$mergeVar}");
             }
 
         } catch (\Exception $e) {
@@ -416,7 +505,7 @@ class VideoController extends Controller
 
     public function download($encodedPath)
     {
-        $baseDir = base64_decode($encodedPath);
+        $baseDir = $encodedPath;
 
         if (!is_dir($baseDir)) {
             abort(404, '项目不存在');

@@ -44,7 +44,7 @@
                         </div>
 
                         <div class="mt-4">
-                            <a href="{{ route('video.download', base64_encode($project->base_dir)) }}"
+                            <a href="{{ route('video.download', ['encodedPath' => $project->base_dir]) }}"
                                class="inline-block px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">
                                 下载视频
                             </a>
